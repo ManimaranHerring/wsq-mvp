@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  learner
+  corporate_admin
+  provider_admin
+  admin
+}
+
+enum OrgType {
+  provider
+  corporate
+  platform
+}
+
+enum CourseMode {
+  in_person
+  online
+  blended
+}
+
+enum EnrollStatus {
+  clicked
+  referred
+  booked
+  in_progress
+  completed
+  cancelled
+}
+
+enum ResultStatus {
+  pass
+  fail
+  incomplete
+}
+
+model Organization {
+  id                      String   @id @default(uuid())
+  type                    OrgType
+  name                    String
+  wsq_accreditation_no    String?
+  website                 String?
+  contact_email           String?
+  verified                Boolean  @default(false)
+  subscription_plan       String   @default("free")
+  subscription_expires_at DateTime?
+  courses                 Course[]
+  users                   User[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  password_hash  String?
+  role           UserRole
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  created_at     DateTime @default(now())
+  reviews        Review[]
+}
+
+model Course {
+  id             String   @id @default(uuid())
+  providerId     String
+  provider       Organization @relation(fields: [providerId], references: [id])
+  title          String
+  description    String?
+  mode           CourseMode
+  industry       String?
+  duration_hours Float?
+  location_city  String?
+  price_min      Float?
+  price_max      Float?
+  booking_url    String?
+  is_published   Boolean  @default(true)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  offerings      CourseOffering[]
+  reviews        Review[]
+  enrollments    Enrollment[]
+}
+
+model CourseOffering {
+  id               String  @id @default(uuid())
+  courseId         String
+  course           Course  @relation(fields: [courseId], references: [id])
+  start_date       DateTime?
+  end_date         DateTime?
+  batch_code       String?
+  seats_total      Int?
+  seats_available  Int?
+  schedule         Json?
+  attendance       Attendance[]
+  enrollments      Enrollment[]
+}
+
+model Review {
+  id          String  @id @default(uuid())
+  courseId    String
+  course      Course @relation(fields: [courseId], references: [id])
+  userId      String?
+  user        User?  @relation(fields: [userId], references: [id])
+  rating      Int
+  title       String?
+  body        String?
+  is_approved Boolean @default(false)
+  created_at  DateTime @default(now())
+}
+
+model ReferralSession {
+  id            String  @id @default(uuid())
+  referral_code String  @unique
+  providerId    String?
+  courseId      String?
+  course        Course?  @relation(fields: [courseId], references: [id])
+  utm_source    String?
+  utm_medium    String?
+  utm_campaign  String?
+  click_ts      DateTime @default(now())
+  ip            String?
+  user_agent    String?
+  enrollments   Enrollment[]
+}
+
+model Enrollment {
+  id                 String  @id @default(uuid())
+  courseId           String
+  course             Course @relation(fields: [courseId], references: [id])
+  courseOfferingId   String?
+  courseOffering     CourseOffering? @relation(fields: [courseOfferingId], references: [id])
+  status             EnrollStatus @default(clicked)
+  referralSessionId  String?
+  referralSession    ReferralSession? @relation(fields: [referralSessionId], references: [id])
+  created_at         DateTime @default(now())
+}
+
+model Attendance {
+  id                  String  @id @default(uuid())
+  courseOfferingId    String
+  courseOffering      CourseOffering @relation(fields: [courseOfferingId], references: [id])
+  learnerOrEmployeeId String
+  session_date        DateTime
+  present             Boolean
+}
